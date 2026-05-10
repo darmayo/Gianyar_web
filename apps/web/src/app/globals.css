@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-inter: 'Inter', sans-serif;
+    --font-noto-serif: 'Noto Serif', serif;
+    /* Light mode tokens */
+    --color-bg: #ffffff;
+    --color-bg-subtle: #f8fafc;
+    --color-surface: #ffffff;
+    --color-border: #e5e7eb;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
+  }
+
+  .dark {
+    /* Dark mode tokens */
+    --color-bg: #0f172a;
+    --color-bg-subtle: #1e293b;
+    --color-surface: #1e293b;
+    --color-border: #334155;
+    --color-text: #f1f5f9;
+    --color-text-muted: #94a3b8;
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Aksesibilitas: focus visible yang jelas */
+  :focus-visible {
+    outline: 2px solid #1a5276;
+    outline-offset: 2px;
+  }
+
+  /* Aksesibilitas: ukuran font tidak boleh lebih kecil dari 16px */
+  body {
+    font-size: 16px;
+    line-height: 1.6;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ── Dark Mode Global Overrides ─────────────────────────────────── */
+/* Applied via html.dark prefix so specificity beats Tailwind utilities */
+
+html.dark .bg-white { background-color: #1e293b !important; }
+html.dark .bg-gray-50 { background-color: #0f172a !important; }
+html.dark .bg-gray-100 { background-color: #1e293b !important; }
+html.dark .bg-gray-200 { background-color: #334155 !important; }
+
+/* Text */
+html.dark .text-gray-900 { color: #f1f5f9 !important; }
+html.dark .text-gray-800 { color: #e2e8f0 !important; }
+html.dark .text-gray-700 { color: #cbd5e1 !important; }
+html.dark .text-gray-600 { color: #94a3b8 !important; }
+html.dark .text-gray-500 { color: #64748b !important; }
+html.dark .text-gray-400 { color: #475569 !important; }
+
+/* Borders */
+html.dark .border-gray-100 { border-color: #334155 !important; }
+html.dark .border-gray-200 { border-color: #334155 !important; }
+
+/* Shadow cards */
+html.dark .shadow-sm { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.4) !important; }
+
+/* Inputs */
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Running text ticker background */
+html.dark .bg-blue-900 { background-color: #0c1a2e !important; }
+
+/* Navigation hover states */
+html.dark nav a:hover { background-color: rgba(255,255,255,0.08) !important; }
+
+/* Cards with border */
+html.dark .rounded-2xl.border,
+html.dark .rounded-xl.border { border-color: #334155 !important; }
+
+/* Subtle backgrounds in sections */
+html.dark .bg-blue-50 { background-color: #0c1a2e !important; }
+html.dark .bg-purple-50 { background-color: #1a1030 !important; }
+html.dark .bg-green-50 { background-color: #0a1f15 !important; }
+html.dark .bg-red-50 { background-color: #1f0a0a !important; }
+html.dark .bg-yellow-50 { background-color: #1f1a0a !important; }
+html.dark .bg-amber-50 { background-color: #1f1a0a !important; }
+html.dark .bg-indigo-50 { background-color: #0f102a !important; }
+html.dark .bg-slate-50 { background-color: #0f172a !important; }
+html.dark .bg-teal-50 { background-color: #0a1f1e !important; }
+html.dark .bg-orange-50 { background-color: #1f120a !important; }
+html.dark .bg-cyan-50 { background-color: #0a1a1f !important; }
+html.dark .bg-emerald-50 { background-color: #0a1f12 !important; }
+html.dark .bg-rose-50 { background-color: #1f0a10 !important; }
+html.dark .bg-pink-50 { background-color: #1f0a15 !important; }
+html.dark .bg-lime-50 { background-color: #111f0a !important; }
+html.dark .bg-sky-50 { background-color: #0a101f !important; }
+
+/* Table rows */
+html.dark .hover\:bg-gray-50:hover { background-color: #1e293b !important; }
+html.dark .hover\:bg-gray-50\/50:hover { background-color: rgba(30,41,59,0.5) !important; }
+
+/* Skeleton loading */
+html.dark .bg-gray-200.animate-pulse { background-color: #334155 !important; }
+
+/* Hover overrides */
+html.dark .hover\:bg-blue-50:hover { background-color: #1e293b !important; }
+html.dark .hover\:bg-gray-100:hover { background-color: #334155 !important; }
+html.dark .hover\:bg-white:hover { background-color: #1e293b !important; }
+
+/* ── High Contrast Mode ──────────────────────────────────────────── */
+html.high-contrast,
+html.high-contrast body {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+html.high-contrast *:not(script):not(style) {
+  background-color: transparent !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+html.high-contrast a,
+html.high-contrast button,
+html.high-contrast [role="button"] {
+  color: #0000cc !important;
+  text-decoration: underline !important;
+  background-color: transparent !important;
+  border: 2px solid #000000 !important;
+}
+html.high-contrast button:hover,
+html.high-contrast a:hover {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+html.high-contrast input,
+html.high-contrast textarea,
+html.high-contrast select {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+}
+html.high-contrast nav,
+html.high-contrast header,
+html.high-contrast footer {
+  background-color: #000000 !important;
+}
+html.high-contrast nav *,
+html.high-contrast header *:not(input),
+html.high-contrast footer * {
+  color: #ffffff !important;
+}
+html.high-contrast img { filter: contrast(1.2); }
+
+/* ── Ticker Pause on Hover ───────────────────────────────────────── */
+.ticker-wrapper:hover .ticker-content,
+.ticker-wrapper:focus-within .ticker-content {
+  animation-play-state: paused;
+}
+
+/* ── Reduced Motion ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-content {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

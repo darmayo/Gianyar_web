@@ -1,0 +1,23 @@
+{
+  "name": "Portal Kabupaten Gianyar",
+  "short_name": "Gianyar",
+  "description": "Layanan publik digital Pemerintah Kabupaten Gianyar, Bali",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a5276",
+  "theme_color": "#1a5276",
+  "orientation": "portrait-primary",
+  "lang": "id",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Layanan Publik", "url": "/layanan", "description": "Akses layanan publik digital", "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }] },
+    { "name": "Pengaduan", "url": "/pengaduan/buat", "description": "Buat pengaduan baru", "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }] },
+    { "name": "Darurat", "url": "/darurat", "description": "Kontak darurat Gianyar", "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }] },
+    { "name": "Cek Pajak", "url": "/cek-pajak", "description": "Cek tagihan pajak PBB", "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }] }
+  ],
+  "categories": ["government", "utilities"],
+  "prefer_related_applications": false
+}

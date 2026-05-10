@@ -1,0 +1,35 @@
+{
+  "name": "gianyar-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portal Resmi Pemerintah Kabupaten Gianyar, Bali",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "type-check": "turbo run type-check",
+    "db:generate": "cd packages/db && npx prisma generate",
+    "db:migrate": "cd packages/db && npx prisma migrate dev",
+    "db:seed": "cd packages/db && npx prisma db seed",
+    "docker:up": "docker-compose -f infra/docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f infra/docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f infra/docker/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "patch-package": "^8.0.1",
+    "prettier": "^3.8.2",
+    "turbo": "^2.9.6",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "npm@11.8.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

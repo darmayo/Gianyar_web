@@ -1,0 +1,125 @@
+version: '3.9'
+
+# ============================================================
+# Monitoring Stack — Grafana + Prometheus + Loki
+# Jalankan: docker-compose -f docker-compose.monitoring.yml up -d
+# Grafana UI: http://localhost:3001
+# ============================================================
+
+services:
+  # === Prometheus (Metrics Collector) ===
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: gianyar_prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring_net
+
+  # === Grafana (Dashboard & Alerting) ===
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: gianyar_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-ganti_password_kuat}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/monitoring"
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: ${SMTP_HOST}
+      GF_SMTP_USER: ${SMTP_USER}
+      GF_SMTP_PASSWORD: ${SMTP_PASS}
+      GF_ALERTING_ENABLED: "true"
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring_net
+
+  # === Loki (Log Aggregation) ===
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: gianyar_loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    networks:
+      - monitoring_net
+
+  # === Promtail (Log Shipper — kirim log ke Loki) ===
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: gianyar_promtail
+    restart: unless-stopped
+    volumes:
+      - ./promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/promtail.yml
+    depends_on:
+      - loki
+    networks:
+      - monitoring_net
+
+  # === Node Exporter (Server metrics CPU/RAM/Disk) ===
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: gianyar_node_exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring_net
+
+  # === Postgres Exporter ===
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: gianyar_pg_exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: ${DATABASE_URL}
+    ports:
+      - "9187:9187"
+    networks:
+      - monitoring_net
+
+volumes:
+  prometheus_data:
+    name: gianyar_prometheus_data
+  grafana_data:
+    name: gianyar_grafana_data
+  loki_data:
+    name: gianyar_loki_data
+
+networks:
+  monitoring_net:
+    name: gianyar_monitoring
+    driver: bridge
