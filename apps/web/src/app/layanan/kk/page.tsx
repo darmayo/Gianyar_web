@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Users, CheckCircle, AlertCircle, Upload, X } from 'lucide-react'
+import { uploadPengajuanDocuments, validateClientDocuments } from '@/lib/document-upload-client'
 
 const KECAMATAN = ['Gianyar','Ubud','Sukawati','Blahbatuh','Tampaksiring','Tegallalang','Payangan']
 const ALASAN = [
@@ -11,6 +12,8 @@ const ALASAN = [
   {value:'HILANG', label:'KK Hilang/Rusak'},
 ]
 
+type TicketState = { nomor: string; token: string; statusUrl: string }
+
 export default function KKPage() {
   const [form, setForm] = useState<Record<string,string>>({})
   const [files, setFiles] = useState<File[]>([])
@@ -19,11 +22,23 @@ export default function KKPage() {
   const [captchaB] = useState(() => Math.floor(1+Math.random()*9))
   const [captchaInput, setCaptchaInput] = useState('')
   const [errors, setErrors] = useState<Record<string,string>>({})
-  const [tiket, setTiket] = useState('')
+  const [tiket, setTiket] = useState<TicketState | null>(null)
   const [loading, setLoading] = useState(false)
+  const [uploadWarning, setUploadWarning] = useState('')
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const sel = Array.from(e.target.files ?? []).slice(0,5)
+    const clientError = validateClientDocuments(sel, 5)
+    if (clientError) {
+      setErrors((prev) => ({ ...prev, files: clientError }))
+      e.target.value = ''
+      return
+    }
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next.files
+      return next
+    })
     setFiles(sel)
   }
 
@@ -53,11 +68,43 @@ export default function KKPage() {
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
     setLoading(true)
-    await new Promise(r => setTimeout(r, 1200))
-    const year = new Date().getFullYear()
-    const seq = Math.floor(100000 + Math.random() * 900000)
-    setTiket(`KK-${year}-${seq}`)
-    setLoading(false)
+    setUploadWarning('')
+    try {
+      const { namaKepala, noHp, ...dataFormulir } = form
+      const res = await fetch('/api/pengajuan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jenisLayanan: 'KK',
+          namaSubmitter: namaKepala,
+          kontakSubmitter: noHp,
+          dataFormulir: {
+            ...dataFormulir,
+            namaKepala,
+            noHp,
+            dokumenPendukung: files.map((file) => ({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+            })),
+          },
+        }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error ?? 'Gagal mengirim permohonan')
+      if (files.length > 0) {
+        try {
+          await uploadPengajuanDocuments(result.nomorTiket, result.trackingToken, files)
+        } catch {
+          setUploadWarning('Permohonan diterima, tetapi sebagian dokumen gagal diunggah. Hubungi petugas dengan nomor tiket bila dokumen diminta ulang.')
+        }
+      }
+      setTiket({ nomor: result.nomorTiket, token: result.trackingToken, statusUrl: result.statusUrl })
+    } catch (err) {
+      setErrors({ submit: err instanceof Error ? err.message : 'Gagal mengirim permohonan' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (tiket) return (
@@ -67,8 +114,10 @@ export default function KKPage() {
       <p className="text-gray-500 mb-6">Permohonan Anda sedang diproses</p>
       <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-2xl p-7 max-w-sm mx-auto my-6 shadow-lg">
         <p className="text-sm text-blue-200 mb-1">Nomor Tiket</p>
-        <p className="text-3xl font-black font-mono tracking-wider">{tiket}</p>
-        <p className="text-xs text-blue-300 mt-2">Simpan untuk cek status permohonan</p>
+        <p className="text-3xl font-black font-mono tracking-wider">{tiket.nomor}</p>
+        <p className="text-sm text-blue-200 mt-4 mb-1">Token Tracking</p>
+        <p className="text-xs font-mono break-all bg-white/10 rounded-lg px-3 py-2">{tiket.token}</p>
+        <p className="text-xs text-blue-300 mt-2">Simpan nomor tiket dan token untuk cek status permohonan</p>
       </div>
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 text-left mb-6">
         <p className="font-semibold mb-1">Langkah selanjutnya:</p>
@@ -79,9 +128,14 @@ export default function KKPage() {
           <li>Proses selesai 5 hari kerja</li>
         </ul>
       </div>
+      {uploadWarning && (
+        <p className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800 mb-4">
+          {uploadWarning}
+        </p>
+      )}
       <div className="flex gap-3 justify-center">
-        <a href="/pengaduan/cek" className="px-5 py-2.5 border border-blue-900 text-blue-900 rounded-lg text-sm font-medium hover:bg-blue-50 transition">Cek Status</a>
-        <button onClick={() => { setTiket(''); setForm({}); setFiles([]) }} className="px-5 py-2.5 bg-blue-900 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">Permohonan Baru</button>
+        <a href={tiket.statusUrl} className="px-5 py-2.5 border border-blue-900 text-blue-900 rounded-lg text-sm font-medium hover:bg-blue-50 transition">Cek Status</a>
+        <button onClick={() => { setTiket(null); setForm({}); setFiles([]) }} className="px-5 py-2.5 bg-blue-900 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">Permohonan Baru</button>
       </div>
     </div>
   )
@@ -189,6 +243,7 @@ export default function KKPage() {
               <button type="button" onClick={() => setFiles(p => p.filter((_,j)=>j!==i))} className="ml-auto text-gray-400 hover:text-red-500"><X size={12} /></button>
             </div>
           ))}
+          {errors.files && <p className="text-xs text-red-600 mt-1" role="alert">{errors.files}</p>}
         </div>
 
         {/* CAPTCHA */}
@@ -210,7 +265,7 @@ export default function KKPage() {
 
         {Object.keys(errors).length > 0 && (
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-            <AlertCircle size={16} /> Periksa kembali isian Anda
+            <AlertCircle size={16} /> {errors.submit ?? 'Periksa kembali isian Anda'}
           </div>
         )}
 

@@ -16,6 +16,13 @@
     "db:generate": "cd packages/db && npx prisma generate",
     "db:migrate": "cd packages/db && npx prisma migrate dev",
     "db:seed": "cd packages/db && npx prisma db seed",
+    "db:apply": "node scripts/apply-db-schema.mjs",
+    "db:test:up": "docker-compose -f infra/docker/docker-compose.test.yml up -d",
+    "db:test:down": "docker-compose -f infra/docker/docker-compose.test.yml down",
+    "notifications:worker": "npm --workspace web run notifications:worker",
+    "notifications:worker:dry-run": "npm --workspace web run notifications:worker:dry-run",
+    "smoke:minio": "npm --workspace web run smoke:minio",
+    "smoke:smtp": "npm --workspace web run smoke:smtp",
     "docker:up": "docker-compose -f infra/docker/docker-compose.yml up -d",
     "docker:down": "docker-compose -f infra/docker/docker-compose.yml down",
     "docker:logs": "docker-compose -f infra/docker/docker-compose.yml logs -f"
@@ -26,6 +33,10 @@
     "prettier": "^3.8.2",
     "turbo": "^2.9.6",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "postcss": "8.5.15",
+    "tmp": "0.2.6"
   },
   "packageManager": "npm@11.8.0",
   "engines": {

@@ -5,6 +5,8 @@ import crypto from 'crypto'
 // Next.js Config — Performa + Keamanan + Anti-Fingerprinting
 // ============================================================
 
+const isProduction = process.env.NODE_ENV === 'production'
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
@@ -79,7 +81,9 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              isProduction
+                ? "script-src 'self' 'unsafe-inline'"
+                : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
               "font-src 'self' fonts.gstatic.com",
               // img-src: tambah tile server OSM & CDN leaflet

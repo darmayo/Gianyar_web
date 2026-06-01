@@ -1,20 +1,20 @@
 // ============================================================
-// GET /api/cek-bansos?nik_hash=SHA256&nama=XXX
+// GET /api/cek-bansos?nik=16DIGIT&nama=XXX
 //
 // SECURITY ANALYST NOTE — Endpoint ini SANGAT sensitif karena
 // data bansos berkaitan langsung dengan kondisi sosial-ekonomi warga.
 //
 // Desain keamanan yang diterapkan:
 //
-//  ✓ Klien TIDAK mengirim NIK plaintext ke API.
-//    Client-side hash: SHA-256(NIK) dikirim sebagai `nik_hash`.
-//    → Jika traffic dicegat, NIK tidak bocor.
+//  ✓ NIK tidak dipakai sebagai identifier publik berbentuk hash.
+//    Server membuat HMAC-SHA256 dengan pepper dari env sebelum lookup.
+//    Output HMAC tetap diperlakukan sebagai data sensitif.
 //
 //  ✓ Rate limit sangat ketat: 3 request / 60 detik per IP
 //    → Dengan 60 detik window dan 3 request, penyerang butuh
 //       ~320 tahun untuk scan seluruh NIK Indonesia (270 juta)
 //
-//  ✓ Rate limit per NIK hash: 2 request / 5 menit
+//  ✓ Rate limit per HMAC NIK: 2 request / 5 menit
 //    → Membatasi credential stuffing / brute force
 //
 //  ✓ Nama wajib diisi dan dicocokkan (poor-man's authz)
@@ -25,13 +25,28 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createHash } from 'crypto'
+import { createHmac } from 'crypto'
 import { z } from 'zod'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limiter'
 
+function getNikHashPepper(): string {
+  if (process.env.NODE_ENV === 'production') {
+    const pepper = process.env.NIK_HASH_PEPPER
+    if (pepper) return pepper
+    throw new Error('NIK_HASH_PEPPER is required in production')
+  }
+
+  const pepper = process.env.NIK_HASH_PEPPER ?? process.env.NIK_ENCRYPTION_KEY
+  if (pepper) return pepper
+  throw new Error('NIK_HASH_PEPPER is required in production')
+}
+
+function hmacNik(nik: string, pepper = getNikHashPepper()): string {
+  return createHmac('sha256', pepper).update(nik).digest('hex')
+}
+
 const querySchema = z.object({
-  // Klien mengirim SHA-256(NIK) bukan NIK langsung
-  nik_hash: z.string().regex(/^[a-f0-9]{64}$/, 'Format tidak valid'),
+  nik: z.string().regex(/^\d{16}$/, 'NIK harus 16 digit'),
   nama: z
     .string()
     .min(3, 'Nama terlalu pendek')
@@ -40,33 +55,39 @@ const querySchema = z.object({
 })
 
 // Mock data bansos (Production: query ke DB DTKS / Kemensos API)
-// Key = SHA-256(NIK)
-const MOCK_BANSOS: Record<
-  string,
-  { namaResmi: string; program: string[]; status: string; nilaiPerBulan: number; namaBank: string }
-> = {
-  // SHA-256("3104012909980001") — NIK contoh fiktif
-  [createHash('sha256').update('3104012909980001').digest('hex')]: {
+// Key = HMAC-SHA256(NIK, NIK_HASH_PEPPER)
+const MOCK_BANSOS_SOURCE: Array<{
+  nik: string
+  data: { namaResmi: string; program: string[]; status: string; nilaiPerBulan: number; namaBank: string }
+}> = [
+  // NIK contoh fiktif; HMAC dihitung server-side.
+  {
+    nik: '3104012909980001',
+    data: {
     namaResmi: 'siti rahayu',
     program: ['PKH', 'BPNT'],
     status: 'AKTIF',
     nilaiPerBulan: 750_000,
     namaBank: 'BRI',
+    },
   },
-  [createHash('sha256').update('5104011504850002').digest('hex')]: {
+  {
+    nik: '5104011504850002',
+    data: {
     namaResmi: 'i wayan karma',
     program: ['JKN-KIS'],
     status: 'AKTIF',
     nilaiPerBulan: 0,
     namaBank: '-',
+    },
   },
-}
+]
 
 export async function GET(req: NextRequest) {
   const ip = getClientIp(req)
 
   // ── Rate limit per IP: 3 req / 60 detik ──────────────────
-  const rlIp = checkRateLimit(`cek-bansos-ip:${ip}`, 3, 60_000)
+  const rlIp = await checkRateLimit(`cek-bansos-ip:${ip}`, 3, 60_000)
   if (!rlIp.allowed) {
     return NextResponse.json(
       {
@@ -79,7 +100,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const raw = {
-    nik_hash: searchParams.get('nik_hash') ?? '',
+    nik: searchParams.get('nik') ?? '',
     nama: searchParams.get('nama') ?? '',
   }
 
@@ -88,11 +109,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Parameter tidak valid' }, { status: 400 })
   }
 
-  const { nik_hash, nama } = parsed.data
+  const { nik, nama } = parsed.data
+  let pepper: string
+  let nikDigest: string
+  try {
+    pepper = getNikHashPepper()
+    nikDigest = hmacNik(nik, pepper)
+  } catch {
+    return NextResponse.json({ error: 'Konfigurasi keamanan server belum siap' }, { status: 500 })
+  }
 
-  // ── Rate limit per NIK hash: 2 req / 5 menit ─────────────
-  const nikHashShort = nik_hash.slice(0, 16)
-  const rlNik = checkRateLimit(`cek-bansos-nik:${nikHashShort}`, 2, 5 * 60_000)
+  // ── Rate limit per HMAC NIK: 2 req / 5 menit ─────────────
+  const nikDigestShort = nikDigest.slice(0, 16)
+  const rlNik = await checkRateLimit(`cek-bansos-nik:${nikDigestShort}`, 2, 5 * 60_000)
   if (!rlNik.allowed) {
     return NextResponse.json(
       { error: 'Pengecekan untuk NIK ini sudah mencapai batas. Coba lagi dalam 5 menit.' },
@@ -100,7 +129,7 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const data = MOCK_BANSOS[nik_hash]
+  const data = MOCK_BANSOS_SOURCE.find((item) => hmacNik(item.nik, pepper) === nikDigest)?.data
 
   // SECURITY: Validasi nama sebelum mengembalikan data
   // Jika NIK tidak ada ATAU nama tidak cocok → sama-sama 404

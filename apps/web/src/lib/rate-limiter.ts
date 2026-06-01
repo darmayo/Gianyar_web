@@ -14,7 +14,9 @@ interface RateLimitEntry {
   resetAt: number
 }
 
-// Singleton store — persist across warm function invocations
+import { getRedisClient } from '@/lib/redis'
+
+// Fallback lokal bila REDIS_URL belum diset.
 const store = new Map<string, RateLimitEntry>()
 
 // Bersihkan entry kadaluarsa setiap 5 menit agar tidak bocor memori
@@ -37,11 +39,40 @@ export interface RateLimitResult {
  * @param maxRequests Maksimal request dalam jendela waktu
  * @param windowMs    Jendela waktu dalam milidetik
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   maxRequests: number,
   windowMs: number
-): RateLimitResult {
+): Promise<RateLimitResult> {
+  const redis = await getRedisClient()
+  if (redis) {
+    const redisKey = `rate-limit:${key}`
+    const count = await redis.incr(redisKey)
+    let ttl = await redis.pTTL(redisKey)
+
+    if (count === 1 || ttl < 0) {
+      await redis.pExpire(redisKey, windowMs)
+      ttl = windowMs
+    }
+
+    const resetAt = Date.now() + ttl
+    if (count > maxRequests) {
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt,
+        retryAfterSeconds: Math.ceil(ttl / 1000),
+      }
+    }
+
+    return {
+      allowed: true,
+      remaining: Math.max(0, maxRequests - count),
+      resetAt,
+      retryAfterSeconds: 0,
+    }
+  }
+
   const now = Date.now()
   const entry = store.get(key)
 

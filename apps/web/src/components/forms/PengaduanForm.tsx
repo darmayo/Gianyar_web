@@ -9,6 +9,7 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { uploadPengajuanDocuments, validateClientDocuments } from '@/lib/document-upload-client'
 
 const pengaduanSchema = z.object({
   judul: z.string().min(5, 'Judul minimal 5 karakter').max(200),
@@ -43,8 +44,11 @@ const KATEGORI_OPTIONS = [
 export function PengaduanForm() {
   const [formState, setFormState] = useState<FormState>('idle')
   const [nomorTiket, setNomorTiket] = useState<string>('')
+  const [trackingToken, setTrackingToken] = useState<string>('')
+  const [statusUrl, setStatusUrl] = useState<string>('')
   const [files, setFiles] = useState<File[]>([])
   const [fileError, setFileError] = useState<string>('')
+  const [uploadWarning, setUploadWarning] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -67,6 +71,13 @@ export function PengaduanForm() {
       return
     }
 
+    const clientError = validateClientDocuments(selectedFiles, 3)
+    if (clientError) {
+      setFileError(clientError)
+      e.target.value = ''
+      return
+    }
+
     for (const file of selectedFiles) {
       const result = fileUploadSchema.safeParse({
         name: file.name,
@@ -85,27 +96,43 @@ export function PengaduanForm() {
 
   const onSubmit = async (data: PengaduanInput) => {
     setFormState('submitting')
+    setUploadWarning('')
 
     try {
-      const formData = new FormData()
-      Object.entries(data).forEach(([key, val]) => {
-        formData.append(key, String(val))
-      })
-      files.forEach((file) => formData.append('lampiran', file))
-
-      const res = await fetch('/api/pengaduan', {
+      const res = await fetch('/api/pengajuan', {
         method: 'POST',
-        body: formData,
-        // CSRF: browser otomatis kirim cookie SameSite
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jenisLayanan: 'PENGADUAN',
+          namaSubmitter: data.isAnonim ? 'Anonim' : 'Warga Gianyar',
+          kontakSubmitter: 'tidak-diberikan',
+          dataFormulir: {
+            ...data,
+            lampiran: files.map((file) => ({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+            })),
+          },
+        }),
       })
 
       if (!res.ok) {
         const err = await res.json()
-        throw new Error(err.message ?? 'Gagal mengirim pengaduan')
+        throw new Error(err.error ?? err.message ?? 'Gagal mengirim pengaduan')
       }
 
       const result = await res.json()
+      if (files.length > 0) {
+        try {
+          await uploadPengajuanDocuments(result.nomorTiket, result.trackingToken, files)
+        } catch {
+          setUploadWarning('Pengajuan diterima, tetapi sebagian lampiran gagal diunggah. Hubungi petugas dengan nomor tiket bila dokumen diminta ulang.')
+        }
+      }
       setNomorTiket(result.nomorTiket)
+      setTrackingToken(result.trackingToken)
+      setStatusUrl(result.statusUrl)
       setFormState('success')
       reset()
       setFiles([])
@@ -132,12 +159,23 @@ export function PengaduanForm() {
         <p className="text-3xl font-mono font-bold text-green-900 mb-4">
           {nomorTiket}
         </p>
+        <p className="text-green-700 mb-2">
+          Token tracking:
+        </p>
+        <p className="text-sm font-mono break-all text-green-900 bg-white/70 rounded-lg px-3 py-2 mb-4">
+          {trackingToken}
+        </p>
         <p className="text-sm text-green-600 mb-6">
-          Simpan nomor tiket ini untuk memantau status pengaduan Anda.
+          Simpan nomor tiket dan token tracking ini untuk memantau status pengaduan Anda.
           Notifikasi akan dikirim ke email/WhatsApp yang terdaftar.
         </p>
+        {uploadWarning && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+            {uploadWarning}
+          </p>
+        )}
         <a
-          href={`/pengaduan/cek?tiket=${nomorTiket}`}
+          href={statusUrl || '/pengaduan/cek'}
           className="inline-block bg-green-700 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors"
         >
           Pantau Status Pengaduan

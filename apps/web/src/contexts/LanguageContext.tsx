@@ -50,7 +50,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   function setLang(l: Lang) {
     setLangState(l)
     localStorage.setItem('lang', l)
+    document.documentElement.lang = l
   }
+
+  useEffect(() => {
+    document.documentElement.lang = lang
+  }, [lang])
 
   // Buat translator yang cache per perubahan lang
   const translator = useCallback((key: string, fallback?: string) => getT(lang)(key, fallback), [lang])

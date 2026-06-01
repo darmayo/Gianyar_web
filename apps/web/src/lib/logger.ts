@@ -68,8 +68,9 @@ function createLogger(context?: string) {
       case 'error': console.error(formatted); break
     }
 
-    // Di production: kirim ke endpoint logging (opsional)
-    if (level === 'error' && process.env.NODE_ENV === 'production') {
+    // Browser tidak membawa secret LOG_INGEST_TOKEN; endpoint ingest production
+    // hanya menerima penulis internal.
+    if (level === 'error' && process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
       reportToServer(entry).catch(() => {})
     }
   }

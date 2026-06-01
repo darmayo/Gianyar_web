@@ -407,7 +407,7 @@ function FormField({
 
 interface DynamicFormProps {
   defaultJenis?: string
-  onSuccess?: (tiket: string, jenis: string) => void
+  onSuccess?: (tiket: string, jenis: string, trackingToken?: string) => void
   className?: string
 }
 
@@ -415,7 +415,7 @@ export function DynamicForm({ defaultJenis, onSuccess, className = '' }: Dynamic
   const [selectedJenis, setSelectedJenis] = useState(defaultJenis ?? '')
   const [loading, setLoading] = useState(false)
   const [serverError, setServerError] = useState('')
-  const [tiket, setTiket] = useState<{ nomor: string; jenis: string } | null>(null)
+  const [tiket, setTiket] = useState<{ nomor: string; token: string; statusUrl: string; jenis: string } | null>(null)
 
   const config = FORM_CONFIGS.find((c) => c.jenis === selectedJenis)
   const schema = config ? buildZodSchema(config.fields) : z.object({
@@ -455,8 +455,13 @@ export function DynamicForm({ defaultJenis, onSuccess, className = '' }: Dynamic
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error ?? 'Gagal mengirim permohonan')
-      setTiket({ nomor: result.nomorTiket, jenis: config.label })
-      onSuccess?.(result.nomorTiket, selectedJenis)
+      setTiket({
+        nomor: result.nomorTiket,
+        token: result.trackingToken,
+        statusUrl: result.statusUrl,
+        jenis: config.label,
+      })
+      onSuccess?.(result.nomorTiket, selectedJenis, result.trackingToken)
       reset()
     } catch (err: unknown) {
       setServerError(err instanceof Error ? err.message : 'Terjadi kesalahan, coba lagi.')
@@ -475,11 +480,13 @@ export function DynamicForm({ defaultJenis, onSuccess, className = '' }: Dynamic
         <div className="bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-2xl p-7 max-w-sm mx-auto mb-6 shadow-lg">
           <p className="text-sm text-blue-200 mb-1">Nomor Tiket Anda</p>
           <p className="text-3xl font-black font-mono tracking-wider mb-1">{tiket.nomor}</p>
-          <p className="text-xs text-blue-300">Simpan untuk cek status permohonan</p>
+          <p className="text-sm text-blue-200 mt-4 mb-1">Token Tracking</p>
+          <p className="text-xs font-mono break-all bg-white/10 rounded-lg px-3 py-2">{tiket.token}</p>
+          <p className="text-xs text-blue-300 mt-3">Simpan nomor tiket dan token untuk cek status permohonan</p>
         </div>
         <div className="flex gap-3 justify-center flex-wrap">
           <a
-            href={`/pengaduan/cek?tiket=${tiket.nomor}`}
+            href={tiket.statusUrl}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-900 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition"
           >
             Pantau Status <ArrowRight size={14} />

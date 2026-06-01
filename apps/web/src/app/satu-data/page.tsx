@@ -1,6 +1,6 @@
 'use client'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts'
-import { Database, Users, GraduationCap, Heart, Leaf, TrendingUp } from 'lucide-react'
+import { Database, Users, GraduationCap, Heart, Leaf, TrendingUp, Download } from 'lucide-react'
 import { useLang } from '@/contexts/LanguageContext'
 
 const DATA_KEPENDUDUKAN = [
@@ -53,9 +53,30 @@ export default function SatuDataPage() {
     { label: t('Indeks Gini', 'Gini Index'), value:'0,28', sub: t('Ketimpangan rendah', 'Low inequality'), icon:Database, color:'teal' },
   ]
 
+  function downloadDataset() {
+    const rows = [
+      ['Dataset', 'Kecamatan/Fasilitas/Jenjang', 'Nilai'],
+      ...DATA_KEPENDUDUKAN.map((d) => ['Kependudukan', d.kecamatan, d.penduduk]),
+      ...DATA_PENDIDIKAN.map((d) => ['Pendidikan', d.jenjang, d.total]),
+      ...DATA_KESEHATAN.map((d) => ['Kesehatan', d.fasilitas, d.jumlah]),
+      ...DATA_WISATA.map((d) => ['Pariwisata', d.kategori, d.nilai]),
+    ]
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'satu-data-gianyar.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-3">
         <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900 rounded-full flex items-center justify-center flex-shrink-0">
           <Database size={24} className="text-teal-700 dark:text-teal-300" />
         </div>
@@ -63,6 +84,14 @@ export default function SatuDataPage() {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">{t('Satu Data Gianyar', 'Gianyar One Data')}</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400">{t('Statistik sektoral terpadu — diperbarui berkala', 'Integrated sectoral statistics — updated periodically')}</p>
         </div>
+        </div>
+        <button
+          type="button"
+          onClick={downloadDataset}
+          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-xl text-sm font-semibold hover:bg-teal-600 transition"
+        >
+          <Download size={16} /> {t('Unduh CSV', 'Download CSV')}
+        </button>
       </div>
       <p className="text-xs text-gray-400 dark:text-slate-500 mb-8">{t('Sumber: BPS Kab. Gianyar, Dinas terkait · Data per: 2024', 'Source: BPS Gianyar Regency, Related Agencies · Data as of: 2024')}</p>
 

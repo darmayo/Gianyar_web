@@ -264,7 +264,7 @@ export function Navbar() {
                       <li key={item.href}>
                         <Link href={item.href} onClick={() => { setOpen(false); setMobileExpanded(null) }}
                           className="block px-2 py-1.5 rounded text-sm text-blue-300 hover:text-white hover:bg-blue-800 transition">
-                          {item.label}
+                          {L(item.label, item.labelEn)}
                         </Link>
                       </li>
                     ))}
@@ -275,7 +275,7 @@ export function Navbar() {
           </ul>
 
           <div className="border-t border-blue-800 px-4 py-3 space-y-0.5">
-            <p className="text-xs text-blue-500 font-medium uppercase tracking-wide px-3 mb-1">Layanan Cepat</p>
+            <p className="text-xs text-blue-500 font-medium uppercase tracking-wide px-3 mb-1">{L('Layanan Cepat', 'Quick Services')}</p>
             {UTIL_LINKS.slice(0, 6).map(l => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)}
                 className="block px-3 py-1.5 rounded text-sm text-blue-300 hover:bg-blue-800 hover:text-white transition">

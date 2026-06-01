@@ -1,9 +1,23 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { MessageSquare, ThumbsUp, ChevronDown, ChevronUp, Send, Users, Calendar, MapPin } from 'lucide-react'
 import { useLang } from '@/contexts/LanguageContext'
 
-const USULAN = [
+type Usulan = {
+  id: number
+  judul: string
+  judulEn: string
+  kategori: string
+  kategoriEn: string
+  kecamatan: string
+  suara: number
+  status: string
+  statusEn: string
+  deskripsi: string
+  deskripsiEn: string
+}
+
+const USULAN: Usulan[] = [
   { id:1, judul:'Perbaikan Jalan Raya Tegallalang – Payangan', judulEn:'Road Repair: Tegallalang – Payangan Highway', kategori:'Infrastruktur', kategoriEn:'Infrastructure', kecamatan:'Tegallalang', suara:142, status:'DISETUJUI', statusEn:'APPROVED', deskripsi:'Jalan mengalami kerusakan parah di KM 3–7. Diperlukan perbaikan aspal dan drainase untuk kelancaran akses masyarakat dan wisatawan.', deskripsiEn:'The road is severely damaged at KM 3–7. Asphalt repair and drainage improvement are needed for public and tourist access.' },
   { id:2, judul:'Pembangunan Polindes Desa Mas', judulEn:'Construction of Village Clinic in Mas Village', kategori:'Kesehatan', kategoriEn:'Health', kecamatan:'Ubud', suara:98, status:'DIKAJI', statusEn:'UNDER REVIEW', deskripsi:'Desa Mas belum memiliki Poliklinik Desa (Polindes). Ibu hamil dan balita harus ke Puskesmas Ubud yang jaraknya 7km.', deskripsiEn:'Mas Village lacks a village clinic. Pregnant mothers and toddlers must travel 7km to Ubud Health Center.' },
   { id:3, judul:'Pengadaan Lampu Jalan Solar Panel Kecamatan Payangan', judulEn:'Solar Street Light Installation in Payangan District', kategori:'Infrastruktur', kategoriEn:'Infrastructure', kecamatan:'Payangan', suara:87, status:'DISETUJUI', statusEn:'APPROVED', deskripsi:'Sebanyak 15 titik jalan dusun di Payangan masih gelap di malam hari. Lampu solar panel hemat energi dan bebas kabel.', deskripsiEn:'15 village road spots in Payangan remain dark at night. Solar panel lights are energy-efficient and cable-free.' },
@@ -35,18 +49,32 @@ const KATEGORI_LIST = [
   { id: 'Sosial', en: 'Social' },
 ]
 
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) as T : fallback
+  } catch {
+    return fallback
+  }
+}
+
 export default function MusrenbangPage() {
   const { t } = useLang()
-  const [voted, setVoted] = useState<Set<number>>(new Set())
+  const [voted, setVoted] = useState<Set<number>>(() => new Set(readJson<number[]>('musrenbang:voted', [])))
   const [expanded, setExpanded] = useState<number|null>(null)
   const [form, setForm] = useState({judul:'',kategori:'',kecamatan:'',deskripsi:'',nama:'',noHp:''})
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [localUsulan, setLocalUsulan] = useState<Usulan[]>(() => readJson('musrenbang:usulan', []))
+
+  const allUsulan = useMemo(() => [...localUsulan, ...USULAN], [localUsulan])
 
   function handleVote(id: number) {
     setVoted(p => {
       const next = new Set(p)
       if (next.has(id)) next.delete(id); else next.add(id)
+      localStorage.setItem('musrenbang:voted', JSON.stringify(Array.from(next)))
       return next
     })
   }
@@ -56,6 +84,22 @@ export default function MusrenbangPage() {
     if (!form.judul.trim() || !form.kategori || !form.kecamatan || !form.deskripsi.trim()) return
     setLoading(true)
     await new Promise(r => setTimeout(r, 1000))
+    const item: Usulan = {
+      id: Date.now(),
+      judul: form.judul,
+      judulEn: form.judul,
+      kategori: form.kategori,
+      kategoriEn: form.kategori,
+      kecamatan: form.kecamatan,
+      suara: 1,
+      status: 'PENDING',
+      statusEn: 'PENDING',
+      deskripsi: form.deskripsi,
+      deskripsiEn: form.deskripsi,
+    }
+    const next = [item, ...localUsulan].slice(0, 20)
+    setLocalUsulan(next)
+    localStorage.setItem('musrenbang:usulan', JSON.stringify(next))
     setSubmitted(true)
     setLoading(false)
   }
@@ -91,7 +135,7 @@ export default function MusrenbangPage() {
       <section className="mb-10">
         <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4">{t('Usulan Masyarakat', 'Community Proposals')}</h2>
         <div className="space-y-3">
-          {USULAN.map(u => (
+          {allUsulan.map(u => (
             <div key={u.id} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
               <div className="p-4 flex items-start gap-4">
                 <button onClick={() => handleVote(u.id)}

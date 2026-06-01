@@ -10,8 +10,6 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY apps/web/package.json ./apps/web/
-COPY packages/validators/package.json ./packages/validators/
-COPY packages/ui/package.json ./packages/ui/
 
 RUN npm ci --frozen-lockfile
 

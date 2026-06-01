@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
   const ip = getClientIp(req)
 
   // ── Rate limit per IP: 5 request / 60 detik ──────────────
-  const rlIp = checkRateLimit(`cek-pajak-ip:${ip}`, 5, 60_000)
+  const rlIp = await checkRateLimit(`cek-pajak-ip:${ip}`, 5, 60_000)
   if (!rlIp.allowed) {
     return NextResponse.json(
       {
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
   // ── Rate limit per NOP juga: 3 request / 60 detik ────────
   // Mencegah distributed scraping dari banyak IP berbeda
   const nopHash = createHash('sha256').update(nop).digest('hex').slice(0, 16)
-  const rlNop = checkRateLimit(`cek-pajak-nop:${nopHash}`, 3, 60_000)
+  const rlNop = await checkRateLimit(`cek-pajak-nop:${nopHash}`, 3, 60_000)
   if (!rlNop.allowed) {
     return NextResponse.json(
       { error: 'NOP ini sudah dicek terlalu sering. Coba lagi nanti.' },

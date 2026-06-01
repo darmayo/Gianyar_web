@@ -43,28 +43,45 @@ const IKM_ASPEK = [
   { aspek: 'Kepuasan Keseluruhan', aspekEn: 'Overall Satisfaction', label: 'Puas' },
 ]
 
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) as T : fallback
+  } catch {
+    return fallback
+  }
+}
+
 export default function PartisipasiPage() {
   const { t } = useLang()
-  const [voted, setVoted] = useState<Record<number, number>>({})
-  const [ikmRating, setIkmRating] = useState<Record<string, number>>({})
+  const [voted, setVoted] = useState<Record<number, number>>(() => readJson('partisipasi:voted', {}))
+  const [ikmRating, setIkmRating] = useState<Record<string, number>>(() => readJson('partisipasi:ikm', {}))
   const [ikmHover, setIkmHover] = useState<Record<string, number>>({})
-  const [ikmSubmitted, setIkmSubmitted] = useState(false)
+  const [ikmSubmitted, setIkmSubmitted] = useState(() => Object.keys(readJson<Record<string, number>>('partisipasi:ikm', {})).length > 0)
   const [aspirasiForm, setAspirasiForm] = useState({ topik:'', isi:'', nama:'' })
   const [aspirasiSubmitted, setAspirasiSubmitted] = useState(false)
 
   function handleVote(pollId: number, opsiIdx: number) {
     if (voted[pollId] !== undefined) return
-    setVoted(p => ({...p, [pollId]: opsiIdx}))
+    setVoted(p => {
+      const next = {...p, [pollId]: opsiIdx}
+      localStorage.setItem('partisipasi:voted', JSON.stringify(next))
+      return next
+    })
   }
 
   function submitIkm() {
     if (Object.keys(ikmRating).length < IKM_ASPEK.length) return
+    localStorage.setItem('partisipasi:ikm', JSON.stringify(ikmRating))
     setIkmSubmitted(true)
   }
 
   async function submitAspirasi(e: React.FormEvent) {
     e.preventDefault()
     if (!aspirasiForm.topik || !aspirasiForm.isi.trim()) return
+    const saved = JSON.parse(localStorage.getItem('partisipasi:aspirasi') ?? '[]') as typeof aspirasiForm[]
+    localStorage.setItem('partisipasi:aspirasi', JSON.stringify([{ ...aspirasiForm }, ...saved].slice(0, 20)))
     setAspirasiSubmitted(true)
   }
 

@@ -10,7 +10,8 @@
 import type { LogEntry } from './app-logger'
 
 const LOG_DIR = process.env.LOG_DIR ?? '/tmp/gianyar-logs'
-const MAX_FILE_SIZE_MB = 5
+const MAX_FILE_SIZE_MB = Number(process.env.LOG_MAX_FILE_MB ?? '5')
+const MAX_LOG_LINE_BYTES = 4096
 
 function getLogPath(type: 'error' | 'access' | 'all') {
   const date = new Date().toISOString().slice(0, 10)
@@ -19,7 +20,7 @@ function getLogPath(type: 'error' | 'access' | 'all') {
 
 /**
  * Tulis entry log ke file JSONL (JSON Lines).
- * Aman dipanggil berkali-kali — auto-rotate jika file > MAX_FILE_SIZE_MB.
+ * Aman dipanggil berkali-kali — berhenti menulis saat file harian mencapai batas.
  */
 export async function writeLog(entry: LogEntry): Promise<void> {
   // Hanya jalan di Node.js (server side)
@@ -33,14 +34,29 @@ export async function writeLog(entry: LogEntry): Promise<void> {
 
     const type = entry.level === 'error' ? 'error' : 'all'
     const filePath = getLogPath(type)
-    const line = JSON.stringify(entry) + '\n'
+    let line = JSON.stringify(entry) + '\n'
+    if (Buffer.byteLength(line, 'utf8') > MAX_LOG_LINE_BYTES) {
+      line = JSON.stringify({
+        level: entry.level,
+        message: entry.message.slice(0, 500),
+        timestamp: entry.timestamp,
+        context: entry.context,
+        url: entry.url?.slice(0, 300),
+        data: '[truncated]',
+        error: entry.error
+          ? {
+              name: entry.error.name.slice(0, 100),
+              message: entry.error.message.slice(0, 500),
+            }
+          : undefined,
+      }) + '\n'
+    }
 
-    // Cek ukuran file — rotate jika terlalu besar
+    // Cegah disk flooding: jangan buat file/rotasi tanpa batas.
     try {
       const stats = await fs.stat(filePath)
-      if (stats.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-        const rotated = filePath.replace('.jsonl', `.${Date.now()}.jsonl`)
-        await fs.rename(filePath, rotated)
+      if (stats.size + Buffer.byteLength(line, 'utf8') > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        return
       }
     } catch {
       // File belum ada — tidak apa-apa

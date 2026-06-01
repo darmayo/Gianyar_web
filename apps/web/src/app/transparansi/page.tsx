@@ -49,6 +49,26 @@ export default function TransparansiPage() {
     { label: t('Keterbukaan Info', 'Info Transparency'), value: '#3', sub: t('Peringkat di Bali', 'Rank in Bali'), icon: ExternalLink, color: 'purple' },
   ]
 
+  function downloadReport(report: typeof LAPORAN[number]) {
+    const rows = [
+      ['Tahun', 'Dokumen', 'Opini/Nilai', 'Ukuran'],
+      [report.tahun, lang === 'id' ? report.jenis : report.jenisEn, report.opini, report.ukuran],
+      [],
+      ['Sumber', 'BPKAD Kabupaten Gianyar'],
+      ['Catatan', lang === 'id' ? 'Dokumen contoh portal. Hubungkan ke arsip resmi untuk PDF final.' : 'Portal sample document. Connect to official archive for final PDF.'],
+    ]
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${report.tahun}-${(lang === 'id' ? report.jenis : report.jenisEn).toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-bold text-gray-800 dark:text-slate-100 mb-1">
@@ -166,7 +186,11 @@ export default function TransparansiPage() {
                   </td>
                   <td className="px-5 py-3 hidden sm:table-cell text-gray-400 dark:text-slate-500 text-xs">{l.ukuran}</td>
                   <td className="px-5 py-3 text-center">
-                    <button className="text-xs bg-blue-900 text-white px-3 py-1.5 rounded-lg hover:bg-blue-800 transition flex items-center gap-1 mx-auto">
+                    <button
+                      type="button"
+                      onClick={() => downloadReport(l)}
+                      className="text-xs bg-blue-900 text-white px-3 py-1.5 rounded-lg hover:bg-blue-800 transition flex items-center gap-1 mx-auto"
+                    >
                       <Download size={12} /> {t('Unduh', 'Download')}
                     </button>
                   </td>

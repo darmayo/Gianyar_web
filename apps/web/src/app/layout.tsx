@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import { Inter, Noto_Serif } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
@@ -78,54 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id" className={`${inter.variable} ${notoSerif.variable}`} suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
-        {/* Dark mode: init sebelum render untuk cegah flash putih */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){var d=localStorage.getItem('darkMode');var m=window.matchMedia('(prefers-color-scheme:dark)').matches;if(d==='true'||(d===null&&m))document.documentElement.classList.add('dark');})();` }} />
-        {/* PWA: Register service worker */}
-        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});})}` }} />
-        {/*
-          ── Anti-fingerprinting: intercept window.next SEBELUM Next.js set-nya ──
-          Script ini harus menjadi tag PERTAMA di <head> agar berjalan sebelum
-          runtime Next.js menginject window.next = {version: "x.x.x"}.
-
-          Cara kerja:
-          1. Object.defineProperty mendefinisikan setter untuk window.next
-          2. Saat Next.js assign window.next = {version:"16.2.2",...}
-             setter kita tangkap, hapus version-nya, baru simpan
-          3. Wappalyzer membaca window.next.version → dapat "" atau undefined
-             → tidak bisa menampilkan versi spesifik
-
-          Berlaku di SEMUA mode: dev (Turbopack), production, standalone.
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){
-  var _nextObj;
-  try {
-    Object.defineProperty(window, 'next', {
-      configurable: true,
-      enumerable: true,
-      get: function() { return _nextObj; },
-      set: function(v) {
-        if (v && typeof v === 'object') {
-          // Hapus version number — ini yang dibaca Wappalyzer
-          v.version = '';
-          // Hapus juga buildId jika ada
-          if (v.buildId) v.buildId = '';
-        }
-        _nextObj = v;
-      }
-    });
-  } catch(e) {
-    // Fallback: override setelah DOM ready jika defineProperty gagal
-    if (typeof document !== 'undefined') {
-      document.addEventListener('DOMContentLoaded', function() {
-        if (window.next) { window.next.version = ''; }
-      });
-    }
-  }
-})();`,
-          }}
-        />
+        <Script src="/js/bootstrap.js" strategy="beforeInteractive" />
         {/* PWA iOS */}
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

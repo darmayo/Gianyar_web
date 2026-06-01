@@ -16,8 +16,8 @@ const STEPS = [
   { key: 'SELESAI',     label: 'Selesai',     desc: 'Pengaduan telah diselesaikan' },
 ]
 
-// Validasi nomor tiket — hanya ADU-YYYY-XXXXXX
-const TIKET_REGEX = /^[A-Z]{3}-\d{4}-\d{6}$/
+const TIKET_REGEX = /^[A-Z]{2,10}-\d{4}-\d{6}$/
+const TOKEN_REGEX = /^[A-Za-z0-9_-]{32,128}$/
 
 type StatusData = {
   nomorTiket: string
@@ -29,33 +29,60 @@ type StatusData = {
   riwayat: { status: string; catatan: string; tanggal: string }[]
 }
 
-// Mock data untuk demo — akan diganti API call
-const MOCK: Record<string, StatusData> = {
-  'ADU-2026-000001': {
-    nomorTiket: 'ADU-2026-000001',
-    judul: 'Jalan berlubang di Jl. Raya Ubud KM 3',
-    kategori: 'Infrastruktur',
-    status: 'DIPROSES',
-    createdAt: '1 April 2026',
-    deadlineAt: '15 April 2026',
-    riwayat: [
-      { status: 'DITERIMA',    catatan: 'Pengaduan berhasil diterima oleh sistem',       tanggal: '1 Apr 2026, 10.00' },
-      { status: 'DIVERIFIKASI',catatan: 'Lapangan dikonfirmasi oleh petugas Dinas PU',   tanggal: '2 Apr 2026, 09.30' },
-      { status: 'DIPROSES',    catatan: 'Tim perbaikan jalan sudah diterjunkan',         tanggal: '3 Apr 2026, 08.00' },
-    ],
-  },
+type PengajuanResponse = {
+  nomorTiket: string
+  jenisLayanan: string
+  status: string
+  namaSubmitter: string
+  deadlineAt: string
+  createdAt: string
+  tracking: { status: string; keterangan: string; createdAt: string }[]
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
+function mapStatus(status: string) {
+  return status === 'PENDING' ? 'DITERIMA' : status
+}
+
+function mapPengajuan(result: PengajuanResponse): StatusData {
+  return {
+    nomorTiket: result.nomorTiket,
+    judul: `Permohonan ${result.jenisLayanan}`,
+    kategori: result.jenisLayanan,
+    status: mapStatus(result.status),
+    createdAt: formatDate(result.createdAt),
+    deadlineAt: formatDate(result.deadlineAt),
+    riwayat: result.tracking.map((item) => ({
+      status: mapStatus(item.status),
+      catatan: item.keterangan,
+      tanggal: formatDate(item.createdAt),
+    })),
+  }
 }
 
 export default function CekPengaduanPage() {
   const [input, setInput] = useState('')
+  const [token, setToken] = useState('')
   const [error, setError] = useState('')
   const [data, setData] = useState<StatusData | null>(null)
   const [loading, setLoading] = useState(false)
 
   // Validasi real-time — cegah karakter berbahaya (SQL injection prevention)
   const handleInputChange = (val: string) => {
-    const safe = val.toUpperCase().replace(/[^A-Z0-9\-]/g, '').substring(0, 15)
+    const safe = val.toUpperCase().replace(/[^A-Z0-9\-]/g, '').substring(0, 20)
     setInput(safe)
+    if (error) setError('')
+  }
+
+  const handleTokenChange = (val: string) => {
+    const safe = val.replace(/[^A-Za-z0-9_-]/g, '').substring(0, 128)
+    setToken(safe)
     if (error) setError('')
   }
 
@@ -66,22 +93,30 @@ export default function CekPengaduanPage() {
 
     // Validasi format tiket
     if (!TIKET_REGEX.test(input)) {
-      setError('Format tidak valid. Contoh yang benar: ADU-2026-000001')
+      setError('Format tidak valid. Contoh yang benar: ADU-2026-123456')
       log.warn('Format tiket tidak valid', { input })
+      return
+    }
+
+    if (!TOKEN_REGEX.test(token)) {
+      setError('Token tracking tidak valid. Masukkan token yang diterima saat pengajuan.')
+      log.warn('Format token tracking tidak valid', { tiket: input })
       return
     }
 
     setLoading(true)
     try {
-      // Simulasi API call — ganti dengan fetch('/api/pengaduan/cek?tiket=...')
-      await new Promise((r) => setTimeout(r, 600))
-      const result = MOCK[input]
+      const res = await fetch(`/api/pengajuan?tiket=${encodeURIComponent(input)}`, {
+        headers: { 'x-tracking-token': token },
+      })
+      const result = await res.json()
 
-      if (!result) {
-        setError('Nomor tiket tidak ditemukan. Pastikan nomor tiket sudah benar.')
+      if (!res.ok) {
+        setError(result.error ?? 'Nomor tiket tidak ditemukan. Pastikan nomor tiket sudah benar.')
         log.info('Tiket tidak ditemukan', { tiket: input })
       } else {
-        setData(result)
+        const mapped = mapPengajuan(result)
+        setData(mapped)
         log.info('Tiket ditemukan', { tiket: input, status: result.status })
       }
     } catch (err) {
@@ -100,12 +135,12 @@ export default function CekPengaduanPage() {
     <div className="max-w-2xl mx-auto px-4 py-12">
       <h1 className="text-2xl font-bold text-gray-800 mb-2">Cek Status Pengaduan</h1>
       <p className="text-gray-500 mb-8">
-        Masukkan nomor tiket yang Anda terima saat mengajukan pengaduan.
+        Masukkan nomor tiket dan token tracking yang Anda terima saat mengajukan pengaduan.
       </p>
 
       {/* Form */}
-      <form onSubmit={handleCek} className="flex gap-3 mb-8" role="search">
-        <div className="flex-1">
+      <form onSubmit={handleCek} className="grid gap-3 mb-8 sm:grid-cols-[1fr_1fr_auto]" role="search">
+        <div>
           <label htmlFor="tiket-input" className="sr-only">Nomor tiket pengaduan</label>
           <input
             id="tiket-input"
@@ -113,7 +148,7 @@ export default function CekPengaduanPage() {
             value={input}
             onChange={(e) => handleInputChange(e.target.value)}
             placeholder="ADU-2026-000001"
-            maxLength={15}
+            maxLength={20}
             autoComplete="off"
             spellCheck={false}
             aria-invalid={!!error}
@@ -123,12 +158,29 @@ export default function CekPengaduanPage() {
             }`}
           />
           <p id="tiket-hint" className="sr-only">
-            Format nomor tiket: tiga huruf kapital, tanda hubung, empat angka tahun, tanda hubung, enam angka. Contoh: ADU-2026-000001
+            Format nomor tiket: kode layanan, tanda hubung, empat angka tahun, tanda hubung, enam angka. Contoh: ADU-2026-123456
           </p>
+        </div>
+        <div>
+          <label htmlFor="token-input" className="sr-only">Token tracking</label>
+          <input
+            id="token-input"
+            type="text"
+            value={token}
+            onChange={(e) => handleTokenChange(e.target.value)}
+            placeholder="Token tracking"
+            maxLength={128}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={!!error}
+            className={`w-full px-4 py-3 border rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+              error ? 'border-red-400 bg-red-50' : 'border-gray-300'
+            }`}
+          />
         </div>
         <button
           type="submit"
-          disabled={loading || input.length < 14}
+          disabled={loading || input.length < 14 || token.length < 32}
           aria-busy={loading}
           className="px-6 py-3 bg-blue-900 text-white rounded-xl font-semibold hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
@@ -234,9 +286,8 @@ export default function CekPengaduanPage() {
         </div>
       )}
 
-      {/* Hint demo */}
       <p className="mt-8 text-xs text-gray-400 text-center">
-        Demo: coba tiket <span className="font-mono">ADU-2026-000001</span>
+        Gunakan nomor tiket dan token dari form KTP, KK, formulir layanan, atau pengaduan.
       </p>
     </div>
   )

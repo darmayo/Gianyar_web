@@ -127,9 +127,10 @@ function log(
     console[level === 'debug' ? 'log' : level](JSON.stringify(entry))
   }
 
-  // ── Kirim ke server (error selalu, warn + error di dev) ─
+  // Browser tidak membawa secret LOG_INGEST_TOKEN; endpoint ingest production
+  // hanya untuk internal/server-side writer agar tidak terbuka publik.
   if (typeof window !== 'undefined') {
-    if (level === 'error' || (isDev && level === 'warn')) {
+    if (isDev && (level === 'error' || level === 'warn')) {
       scheduleSend(entry)
     }
   }
